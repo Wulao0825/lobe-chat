@@ -2,6 +2,8 @@ name: Publish Database Docker Clerk Image  # 工作流名称，便于在 GitHub 
 
 on:
   workflow_dispatch:  # 允许在GitHub Actions界面中手动触发
+  schedule:
+    - cron: '10 23 * * *'   # 每天23点10分触发
   release:
     types: [published]  # 当发布新版本(Release)时自动触发
 
