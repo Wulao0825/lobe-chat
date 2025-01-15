@@ -91,3 +91,5 @@ jobs:
         # - 多架构构建可以一次性生成适配不同平台的镜像。
         # - 推送后可在 Docker Hub 私有仓库中查看 wulao/lobechat:latest（或其他标签）的镜像。
         # - 只有当 .build_docker_clerk 的值为 "1" 时，这些核心构建推送步骤才会执行。
+        # - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY、CLERK_SECRET_KEY、CLERK_WEBHOOK_SECRET 同样需要在“Settings” -> “Secrets and variables” -> “Actions” 中配置。
+        # 目前Dockerfile.clerk中 CLERK_SECRET_KEY、CLERK_WEBHOOK_SECRET 的 ENV 是注释的
