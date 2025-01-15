@@ -31,7 +31,7 @@ jobs:
           LATEST_RELEASE="${{ steps.get_release.outputs.latest_release }}"
           echo "Latest release in lobehub/lobe-chat: $LATEST_RELEASE"
 
-          PREV_RELEASE="0.0.0"
+          PREV_RELEASE="unknown"
           if [ -f .last_release ]; then
             PREV_RELEASE=$(cat .last_release)
           fi
