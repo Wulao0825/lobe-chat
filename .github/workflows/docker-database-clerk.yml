@@ -1,6 +1,3 @@
-# 文件名示例：.github/workflows/publish-database-image.yml
-# 你可以根据自己的项目结构自行命名或创建文件
-
 name: Publish Database Docker Clerk Image  # 工作流名称，便于在 GitHub Actions 中区分
 
 on:
@@ -14,21 +11,40 @@ jobs:
     runs-on: ubuntu-latest  # 使用GitHub提供的ubuntu-latest环境作为运行环境
 
     steps:
+      # --------------------【步骤0】：检出仓库代码 -------------------------
       - name: Check out the repo
         uses: actions/checkout@v4
-        # 步骤1：将当前GitHub仓库的代码检出到工作流所在的虚拟机环境。
-        #       这样后续步骤能访问代码文件（包括Dockerfile.database等）。
+        # 说明：将当前GitHub仓库的代码检出到工作流所在的虚拟机环境中。
+        #       这样后续步骤才能读取文件（包括 .build_docker_clerk、Dockerfile.clerk 等）。
 
+      # --------------------【步骤1】：读取.build_docker_clerk文件 -------------------------
+      - name: Read .build_docker_clerk
+        id: read_flag
+        run: |
+          # 如果 .build_docker_clerk 文件不存在，则创建并写入"0"（表示不触发构建）。
+          if [ ! -f ./.build_docker_clerk ]; then
+            echo "0" > ./.build_docker_clerk
+          fi
+
+          # 读取其中的值并存储到 GitHub Actions 的输出变量里，供后续步骤使用
+          build_flag=$(cat ./.build_docker_clerk)
+          echo "build_docker_clerk_flag=$build_flag" >> $GITHUB_OUTPUT
+
+      # --------------------【步骤2】：登录 Docker Hub（受条件限制，仅当build_docker_clerk_flag == 1时执行） -------------------------
       - name: Log in to Docker Hub
+        if: steps.read_flag.outputs.build_docker_clerk_flag == '1'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_REGISTRY_USER }}
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
-        # 步骤2：登录Docker Hub（私有仓库）。
-        #       注意，你需要在GitHub仓库的 "Settings" -> "Secrets and variables" -> "Actions" 中
-        #       配置DOCKER_REGISTRY_USER和DOCKER_REGISTRY_PASSWORD两个密钥，以免账号密码被泄露。
+        # 说明：此步骤会在“build_docker_clerk_flag == 1”时才执行，
+        #       即 .build_docker_clerk 文件中写了“1”，才会登录到 Docker Hub。
+        #       DOCKER_REGISTRY_USER 和 DOCKER_REGISTRY_PASSWORD 需要在 GitHub 仓库中
+        #       “Settings” -> “Secrets and variables” -> “Actions” 中配置。
 
+      # --------------------【步骤3】：生成 Docker 镜像标签与元数据（同样受条件限制） -------------------------
       - name: Extract metadata (tags, labels) for Docker
+        if: steps.read_flag.outputs.build_docker_clerk_flag == '1'
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -36,34 +52,42 @@ jobs:
           tags: |
             type=raw,value=latest
             type=ref,event=tag
-        # 步骤3：自动生成并管理Docker镜像的标签(tags)和元数据(labels)。
-        #       - `type=raw,value=latest` 强制生成latest标签。
-        #       - `type=ref,event=tag` 如果是基于Git标签触发，则生成与Git标签相同的Docker标签(如v1.0.0)。
+        # 说明：
+        # - `type=raw,value=latest` 会强制生成一个 "latest" 标签。
+        # - `type=ref,event=tag` 如果是基于Git标签触发(例如发布版本时)，
+        #   则会自动生成与Git标签同名的Docker镜像标签（如 v1.0.0）。
 
+      # --------------------【步骤4】：启用 QEMU（支持多架构构建，受条件限制） -------------------------
       - name: Set up QEMU
+        if: steps.read_flag.outputs.build_docker_clerk_flag == '1'
         uses: docker/setup-qemu-action@v3
-        # 步骤4：启用QEMU，以便在同一个环境里进行多架构构建(如amd64/arm64)。
-        #       如果只构建单一架构，可以不设置这一项，但通常建议保留多架构支持。
+        # 说明：安装并启用 QEMU，用以支持交叉构建（如 x86_64、ARM64 等不同架构）。
+        #       如果只构建单一架构可以不启用，但多数情况下保留多架构支持更灵活。
 
+      # --------------------【步骤5】：设置 Docker Buildx（受条件限制） -------------------------
       - name: Set up Docker Buildx
+        if: steps.read_flag.outputs.build_docker_clerk_flag == '1'
         uses: docker/setup-buildx-action@v3
-        # 步骤5：启用Docker Buildx，用于多架构构建、缓存等高级特性。
-        #       比如你想构建多个平台的镜像(linux/amd64, linux/arm64)，就需要Buildx。
+        # 说明：启用 Docker Buildx，用于多架构构建以及更高级的构建功能（如缓存）。
 
+      # --------------------【步骤6】：构建并推送 Docker 镜像（受条件限制） -------------------------
       - name: Build and push Docker image
+        if: steps.read_flag.outputs.build_docker_clerk_flag == '1'
         uses: docker/build-push-action@v5
         with:
-          context: .  # 构建上下文为项目根目录，通常包含Dockerfile.database
-          file: ./Dockerfile.clerk  # 指定使用的Dockerfile名称，避免默认Dockerfile冲突
-          platforms: linux/amd64,linux/arm64  # 同时构建x86和ARM64架构
-          push: true  # 构建完成后自动推送到Docker Registry
-          tags: ${{ steps.meta.outputs.tags }}  # 使用上一步metadata-action生成的镜像标签
-          labels: ${{ steps.meta.outputs.labels }}  # 为镜像自动附加对应的元数据标签
-          cache-from: type=gha  # 启用缓存拉取，加速构建
-          cache-to: type=gha,mode=max  # 启用缓存保存，让后续构建也能受益
+          context: .  # 构建上下文为整个仓库根目录，里面应包含 Dockerfile.clerk
+          file: ./Dockerfile.clerk  # 指定要使用的 Dockerfile 路径
+          platforms: linux/amd64,linux/arm64  # 同时构建 x86_64 和 ARM64 架构的镜像
+          push: true  # 构建完成后自动推送到 Docker Registry
+          tags: ${{ steps.meta.outputs.tags }}    # 继承自 metadata-action，自动生成 Docker 标签
+          labels: ${{ steps.meta.outputs.labels }}# 继承自 metadata-action，自动生成 Docker 镜像元数据标签
+          cache-from: type=gha  # 启用从 GitHub Actions 缓存中拉取构建缓存，减少重复构建时间
+          cache-to: type=gha,mode=max  # 启用将构建缓存存储到 GitHub Actions，方便后续使用
           build-args: |
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
             CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
             CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}
-        # 步骤6：核心步骤，使用docker/build-push-action进行多架构镜像构建并推送到Docker Hub(私有仓库)。
-        #       你可以在Docker Hub中查看推送结果，镜像名称即 wulao/lobechat:latest 或其他Tag。
+        # 说明：
+        # - 多架构构建可以一次性生成适配不同平台的镜像。
+        # - 推送后可在 Docker Hub 私有仓库中查看 wulao/lobechat:latest（或其他标签）的镜像。
+        # - 只有当 .build_docker_clerk 的值为 "1" 时，这些核心构建推送步骤才会执行。
