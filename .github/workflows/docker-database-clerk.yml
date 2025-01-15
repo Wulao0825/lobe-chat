@@ -61,5 +61,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}  # 为镜像自动附加对应的元数据标签
           cache-from: type=gha  # 启用缓存拉取，加速构建
           cache-to: type=gha,mode=max  # 启用缓存保存，让后续构建也能受益
+          build-args: |
+            CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
+            CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}
         # 步骤6：核心步骤，使用docker/build-push-action进行多架构镜像构建并推送到Docker Hub(私有仓库)。
         #       你可以在Docker Hub中查看推送结果，镜像名称即 wulao/lobechat:latest 或其他Tag。
