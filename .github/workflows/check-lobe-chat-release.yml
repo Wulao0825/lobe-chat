@@ -5,7 +5,6 @@ on:
     - cron: '0 * * * *'   # 每小时执行一次
   workflow_dispatch:
 
-# 给当前仓库的 Actions “写权限”
 permissions:
   contents: write
 
@@ -46,25 +45,30 @@ jobs:
             echo "UPDATED=false" >> $GITHUB_ENV
           fi
 
-      - name: Commit and push .last_release
-        # 只有在 compare_release 步骤中标记 UPDATED=true 才执行
-        if: env.UPDATED == 'true'
+      - name: Write .build_docker_clerk
+        run: |
+          if [ "${{ env.UPDATED }}" = "true" ]; then
+            echo "1" > .build_docker_clerk
+          else
+            echo "0" > .build_docker_clerk
+          fi
+
+      - name: Commit and push changes
+        # 只有在 compare_release 步骤中标记 UPDATED=true 后才执行提交 .last_release 的逻辑；
+        # 但无论是否更新，这里都会有 .build_docker_clerk 的写入
         run: |
           # 配置 Git 用户信息
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # 加入暂存区
-          git add .last_release
+          git add .last_release .build_docker_clerk || true
 
           # 判断是否有改动
           if git diff --cached --exit-code; then
             echo "No changes to commit."
-            git commit -m "chore: update .build_docker_clerk with new release: 0"
-            git push
           else
-            git commit -m "chore: update .last_release with new release: ${{ steps.get_release.outputs.latest_release }}"
-            git push
-            git commit -m "chore: update .build_docker_clerk with new release: 1"
+            git commit -m "chore: update tracking files (release: ${{ steps.get_release.outputs.latest_release }}, docker_clerk: ${{ env.UPDATED }})"
             git push
           fi
+        shell: bash
