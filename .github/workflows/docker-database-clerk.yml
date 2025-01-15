@@ -1,7 +1,7 @@
 # 文件名示例：.github/workflows/publish-database-image.yml
 # 你可以根据自己的项目结构自行命名或创建文件
 
-name: Publish Database Docker Image  # 工作流名称，便于在 GitHub Actions 中区分
+name: Publish Database Docker Clerk Image  # 工作流名称，便于在 GitHub Actions 中区分
 
 on:
   workflow_dispatch:  # 允许在GitHub Actions界面中手动触发
