@@ -2,7 +2,7 @@ name: Check Lobe-Chat Release
 
 on:
   schedule:
-    - cron: '0 * * * *'   # 每小时执行一次
+    - cron: '5 23 * * *'   # 每小时执行一次
   workflow_dispatch:
 
 permissions:
