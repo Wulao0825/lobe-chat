@@ -60,7 +60,11 @@ jobs:
           # 判断是否有改动
           if git diff --cached --exit-code; then
             echo "No changes to commit."
+            git commit -m "chore: update .build_docker_clerk with new release: 0"
+            git push
           else
             git commit -m "chore: update .last_release with new release: ${{ steps.get_release.outputs.latest_release }}"
+            git push
+            git commit -m "chore: update .build_docker_clerk with new release: 1"
             git push
           fi
