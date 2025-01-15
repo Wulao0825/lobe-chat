@@ -1,0 +1,47 @@
+name: Check Lobe-Chat Release
+
+on:
+  schedule:
+    - cron: '0 23 * * *'  # 每小时执行一次
+  workflow_dispatch:     # 手动触发
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get latest release of lobehub/lobe-chat
+        id: get_release
+        run: |
+          # 通过 GitHub API 获取对方仓库最新 Release 的 tag_name
+          LATEST_RELEASE=$(curl -s "https://api.github.com/repos/lobehub/lobe-chat/releases/latest" | jq -r '.tag_name')
+
+          echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+
+      - name: Compare with previous release
+        run: |
+          # 这里可以自己维护一个文件，记录上一次检查到的版本
+          # 如果不一致，就可以触发后续操作，比如构建、通知、部署等
+          LATEST_RELEASE="${{ steps.get_release.outputs.latest_release }}"
+          echo "Latest release in lobehub/lobe-chat: $LATEST_RELEASE"
+          
+          # 逻辑示例：读取文件中记录的上一次 release
+          PREV_RELEASE="unknown"
+          if [ -f .last_release ]; then
+            PREV_RELEASE=$(cat .last_release)
+          fi
+
+          echo "Previous release: $PREV_RELEASE"
+
+          if [ "$LATEST_RELEASE" != "$PREV_RELEASE" ]; then
+            echo "Detected a new release!"
+            # 在这里执行你想做的事情，比如发送通知或跑构建等
+            # ...
+            
+            # 更新记录
+            echo "$LATEST_RELEASE" > .last_release
+          else
+            echo "No new release found."
+          fi
