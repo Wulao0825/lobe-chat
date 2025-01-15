@@ -44,6 +44,7 @@ jobs:
           else
             echo "No new release found."
             echo "UPDATED=false" >> $GITHUB_ENV
+          fi
 
       - name: Commit and push .last_release
         # 只有在 compare_release 步骤中标记 UPDATED=true 才执行
