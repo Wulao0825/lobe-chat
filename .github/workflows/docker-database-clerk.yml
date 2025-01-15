@@ -1,0 +1,65 @@
+# 文件名示例：.github/workflows/publish-database-image.yml
+# 你可以根据自己的项目结构自行命名或创建文件
+
+name: Publish Database Docker Image  # 工作流名称，便于在 GitHub Actions 中区分
+
+on:
+  workflow_dispatch:  # 允许在GitHub Actions界面中手动触发
+  release:
+    types: [published]  # 当发布新版本(Release)时自动触发
+
+jobs:
+  push_to_registry:
+    name: Push Docker image to Private Docker Hub - wulao/lobechat
+    runs-on: ubuntu-latest  # 使用GitHub提供的ubuntu-latest环境作为运行环境
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+        # 步骤1：将当前GitHub仓库的代码检出到工作流所在的虚拟机环境。
+        #       这样后续步骤能访问代码文件（包括Dockerfile.database等）。
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_REGISTRY_USER }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+        # 步骤2：登录Docker Hub（私有仓库）。
+        #       注意，你需要在GitHub仓库的 "Settings" -> "Secrets and variables" -> "Actions" 中
+        #       配置DOCKER_REGISTRY_USER和DOCKER_REGISTRY_PASSWORD两个密钥，以免账号密码被泄露。
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: wulao/lobechat  # 替换为你自己的Docker Hub仓库名称
+          tags: |
+            type=raw,value=latest
+            type=ref,event=tag
+        # 步骤3：自动生成并管理Docker镜像的标签(tags)和元数据(labels)。
+        #       - `type=raw,value=latest` 强制生成latest标签。
+        #       - `type=ref,event=tag` 如果是基于Git标签触发，则生成与Git标签相同的Docker标签(如v1.0.0)。
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        # 步骤4：启用QEMU，以便在同一个环境里进行多架构构建(如amd64/arm64)。
+        #       如果只构建单一架构，可以不设置这一项，但通常建议保留多架构支持。
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        # 步骤5：启用Docker Buildx，用于多架构构建、缓存等高级特性。
+        #       比如你想构建多个平台的镜像(linux/amd64, linux/arm64)，就需要Buildx。
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .  # 构建上下文为项目根目录，通常包含Dockerfile.database
+          file: ./Dockerfile.database  # 指定使用的Dockerfile名称，避免默认Dockerfile冲突
+          platforms: linux/amd64,linux/arm64  # 同时构建x86和ARM64架构
+          push: true  # 构建完成后自动推送到Docker Registry
+          tags: ${{ steps.meta.outputs.tags }}  # 使用上一步metadata-action生成的镜像标签
+          labels: ${{ steps.meta.outputs.labels }}  # 为镜像自动附加对应的元数据标签
+          cache-from: type=gha  # 启用缓存拉取，加速构建
+          cache-to: type=gha,mode=max  # 启用缓存保存，让后续构建也能受益
+        # 步骤6：核心步骤，使用docker/build-push-action进行多架构镜像构建并推送到Docker Hub(私有仓库)。
+        #       你可以在Docker Hub中查看推送结果，镜像名称即 wulao/lobechat:latest 或其他Tag。
