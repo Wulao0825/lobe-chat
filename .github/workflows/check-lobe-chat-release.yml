@@ -2,33 +2,42 @@ name: Check Lobe-Chat Release
 
 on:
   schedule:
-    - cron: '0 23 * * *'  # 每小时执行一次
-  workflow_dispatch:     # 手动触发
+    - cron: '0 * * * *'  # 每小时执行一次
+  workflow_dispatch:
+
+# 关键：声明这个 Workflow 可以对仓库“写权限”
+permissions:
+  contents: write
 
 jobs:
   check-release:
     runs-on: ubuntu-latest
     steps:
+      # 第一步：拉取代码
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          persist-credentials: true  # 保留 GITHUB_TOKEN 凭据, 允许后续推送
 
+      # 第二步：获取对方仓库的最新 Release 信息
       - name: Get latest release of lobehub/lobe-chat
         id: get_release
         run: |
-          # 通过 GitHub API 获取对方仓库最新 Release 的 tag_name
+          echo "Fetching latest release from lobehub/lobe-chat..."
+          # 使用 GitHub API，并用 jq 提取 tag_name
           LATEST_RELEASE=$(curl -s "https://api.github.com/repos/lobehub/lobe-chat/releases/latest" | jq -r '.tag_name')
-
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
 
+      # 第三步：比较与之前的版本
       - name: Compare with previous release
+        id: compare_release
         run: |
-          # 这里可以自己维护一个文件，记录上一次检查到的版本
-          # 如果不一致，就可以触发后续操作，比如构建、通知、部署等
+          # 读取前面步骤拿到的最新Release
           LATEST_RELEASE="${{ steps.get_release.outputs.latest_release }}"
           echo "Latest release in lobehub/lobe-chat: $LATEST_RELEASE"
-          
-          # 逻辑示例：读取文件中记录的上一次 release
-          PREV_RELEASE="unknown"
+
+          # 如果本地已经存在 .last_release 就读取里面的版本，否则写0.0.0
+          PREV_RELEASE="0.0.0"
           if [ -f .last_release ]; then
             PREV_RELEASE=$(cat .last_release)
           fi
@@ -36,12 +45,30 @@ jobs:
           echo "Previous release: $PREV_RELEASE"
 
           if [ "$LATEST_RELEASE" != "$PREV_RELEASE" ]; then
-            echo "Detected a new release!"
-            # 在这里执行你想做的事情，比如发送通知或跑构建等
-            # ...
-            
-            # 更新记录
+            echo "Detected a new release! Writing to .last_release..."
             echo "$LATEST_RELEASE" > .last_release
+            # 将一个环境变量标记为“有更新”
+            echo "UPDATED=true" >> $GITHUB_ENV
           else
             echo "No new release found."
+            echo "UPDATED=false" >> $GITHUB_ENV
           fi
+
+      # 第四步：如果版本号更新，则提交并推送 .last_release 文件
+      - name: Commit and push .last_release
+        if: env.UPDATED == 'true'  # 只有当有更新时才执行
+        run: |
+          # 配置 Git 用户信息（提交时的Author/Committer）
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 把 .last_release 文件加入暂存区
+          git add .last_release
+
+          # 检查是否有需要提交的差异
+          if ! git diff --cached --exit-code; then
+            # 如果有改动，就提交并推送到当前分支
+            git commit -m "chore: update .last_release with new release: ${{ steps.get_release.outputs.latest_release }}"
+            git push
+          else
+            echo "No changes to commit."
