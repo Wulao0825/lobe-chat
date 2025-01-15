@@ -54,7 +54,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .  # 构建上下文为项目根目录，通常包含Dockerfile.database
-          file: ./Dockerfile.database  # 指定使用的Dockerfile名称，避免默认Dockerfile冲突
+          file: ./Dockerfile.clerk  # 指定使用的Dockerfile名称，避免默认Dockerfile冲突
           platforms: linux/amd64,linux/arm64  # 同时构建x86和ARM64架构
           push: true  # 构建完成后自动推送到Docker Registry
           tags: ${{ steps.meta.outputs.tags }}  # 使用上一步metadata-action生成的镜像标签
