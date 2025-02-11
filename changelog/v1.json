@@ -1,6 +1,38 @@
 [
   {
     "children": {
+      "improvements": ["Refactor the agent runtime test case."]
+    },
+    "date": "2025-02-11",
+    "version": "1.52.19"
+  },
+  {
+    "children": {},
+    "date": "2025-02-11",
+    "version": "1.52.18"
+  },
+  {
+    "children": {},
+    "date": "2025-02-11",
+    "version": "1.52.17"
+  },
+  {
+    "children": {
+      "improvements": ["Support mistral proxy url."]
+    },
+    "date": "2025-02-11",
+    "version": "1.52.16"
+  },
+  {
+    "children": {
+      "fixes": ["Fix lmstudio baseURL."],
+      "improvements": ["Optimized MaxToken Slider."]
+    },
+    "date": "2025-02-10",
+    "version": "1.52.15"
+  },
+  {
+    "children": {
       "improvements": ["Refactor agent settings modal."]
     },
     "date": "2025-02-10",
